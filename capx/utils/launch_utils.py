@@ -162,7 +162,7 @@ def _load_config(args: LaunchArgs) -> tuple[Any, dict[str, Any], list]:
     return env_factory, merged_config, api_servers
 
 
-def _extract_code(content: str) -> list[str]:
+def _extract_code(content: str | None) -> list[str]:
     """Extract Python code from Markdown fenced code block.
 
     Args:
@@ -171,6 +171,9 @@ def _extract_code(content: str) -> list[str]:
     Returns:
         Extracted Python code list
     """
+    if not content:
+        return [""]
+
     fence_start = "```python\n"
     fence_end = "```"
     start_idx = 0

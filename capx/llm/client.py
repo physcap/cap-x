@@ -42,6 +42,8 @@ VLM_MODELS = [
     "deepseek/deepseek-r1",
     "qwen/qwen3.5-122b-a10b",
     "moonshotai/kimi-k2",
+    "openai/gpt-6-astra",
+    "anthropic/claude-fable-5",
 ]
 CLAUDE_MODELS = ["anthropic/claude-opus-4-5", "anthropic/claude-haiku-4-5"]
 OSS_MODELS = [
@@ -53,6 +55,7 @@ OSS_MODELS = [
 ]
 OPENROUTER_MODELS = [
     "openrouter/google/gemini-2.5-pro-preview",
+    "openrouter/google/gemini-3.1-pro-preview",
     "openrouter/google/gemini-2.5-flash-preview",
     "openrouter/anthropic/claude-sonnet-4",
     "openrouter/anthropic/claude-opus-4",
@@ -84,6 +87,16 @@ ENSEMBLE_CONFIGS = [
 def is_openrouter_model(model: str) -> bool:
     """Return True if the model should be routed through the OpenRouter proxy."""
     return model.startswith("openrouter/") or model in OPENROUTER_MODELS
+
+
+def is_gpt_model(model: str) -> bool:
+    """Return True for OpenAI/GPT models (exact list or ``openai/`` namespaced)."""
+    return model in GPT_MODELS or model.startswith("openai/")
+
+
+def is_claude_model(model: str) -> bool:
+    """Return True for Anthropic/Claude models (exact list or ``anthropic/`` namespaced)."""
+    return model in CLAUDE_MODELS or model.startswith("anthropic/")
 
 
 @dataclass
@@ -193,7 +206,7 @@ def query_model(args: "LaunchArgs | ModelQueryArgs", prompt: list[dict]) -> str:
     else:
         server_url = args.server_url
 
-    if args.model in GPT_MODELS:
+    if is_gpt_model(args.model):
         if "codex" in args.model:
             prompt = _completions_to_responses_convert_prompt(prompt)
             payload = {
@@ -214,7 +227,7 @@ def query_model(args: "LaunchArgs | ModelQueryArgs", prompt: list[dict]) -> str:
             "temperature": args.temperature,
             "max_tokens": args.max_tokens,
         }
-    elif args.model in CLAUDE_MODELS:
+    elif is_claude_model(args.model):
         payload = {
             "model": args.model,
             "temperature": args.temperature,
@@ -239,7 +252,7 @@ def query_model(args: "LaunchArgs | ModelQueryArgs", prompt: list[dict]) -> str:
     headers = {"Content-Type": "application/json"}
     if args.api_key:
         headers["Authorization"] = f"Bearer {args.api_key}"
-    elif os.getenv("OPENAI_API_KEY") is not None and args.model in GPT_MODELS:
+    elif os.getenv("OPENAI_API_KEY") is not None and is_gpt_model(args.model):
         headers["Authorization"] = f"Bearer {os.getenv('OPENAI_API_KEY')}"
     start_time = time.time()
 
@@ -265,7 +278,7 @@ def query_model(args: "LaunchArgs | ModelQueryArgs", prompt: list[dict]) -> str:
     if args.debug:
         print(json.dumps(body, indent=2))
     try:
-        if args.model in GPT_MODELS and "codex" in args.model:
+        if is_gpt_model(args.model) and "codex" in args.model:
             out["content"] = body["output_text"]
         else:
             out["content"] = body["choices"][0]["message"]["content"]
@@ -296,7 +309,7 @@ def query_model_streaming(
     Yields:
         Partial response chunks as they arrive
     """
-    if args.model in GPT_MODELS:
+    if is_gpt_model(args.model):
         payload = {
             "model": args.model,
             "reasoning_effort": args.reasoning_effort,
@@ -304,7 +317,7 @@ def query_model_streaming(
             "messages": prompt,
             "stream": True,
         }
-    elif args.model in CLAUDE_MODELS:
+    elif is_claude_model(args.model):
         payload = {
             "model": args.model,
             "temperature": args.temperature,
@@ -325,7 +338,7 @@ def query_model_streaming(
     headers = {"Content-Type": "application/json"}
     if args.api_key:
         headers["Authorization"] = f"Bearer {args.api_key}"
-    elif os.getenv("OPENAI_API_KEY") is not None and args.model in GPT_MODELS:
+    elif os.getenv("OPENAI_API_KEY") is not None and is_gpt_model(args.model):
         headers["Authorization"] = f"Bearer {os.getenv('OPENAI_API_KEY')}"
 
     full_content = ""
